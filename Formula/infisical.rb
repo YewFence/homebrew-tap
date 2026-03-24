@@ -5,12 +5,12 @@
 class Infisical < Formula
   desc "CLI for the Infisical secret manager (yewfence fix fork)"
   homepage "https://github.com/YewFence/infisical-cli"
-  version "0.43.60-yewfix3"
+  version "0.43.60-yewfix4"
 
   on_macos do
     if Hardware::CPU.intel?
-      url "https://github.com/YewFence/infisical-cli/releases/download/v0.43.60-yewfix3/infisical-cli_0.43.60-yewfix3_darwin_amd64.tar.gz"
-      sha256 "70a712883bf39a482b58ff3bab05338002b1ad31282b760ad6f6c178dbe45e75"
+      url "https://github.com/YewFence/infisical-cli/releases/download/v0.43.60-yewfix4/infisical-cli_0.43.60-yewfix4_darwin_amd64.tar.gz"
+      sha256 "a19719d57715cda5781811d0fb7d026b9f1ba82162cc0c9adeb80c31c44e6d27"
 
       define_method(:install) do
         bin.install "infisical"
@@ -21,8 +21,8 @@ class Infisical < Formula
       end
     end
     if Hardware::CPU.arm?
-      url "https://github.com/YewFence/infisical-cli/releases/download/v0.43.60-yewfix3/infisical-cli_0.43.60-yewfix3_darwin_arm64.tar.gz"
-      sha256 "e1db985a4d4704ee02ca6b645aaf5478e440e98ccdf946dacff0b6528fb2631d"
+      url "https://github.com/YewFence/infisical-cli/releases/download/v0.43.60-yewfix4/infisical-cli_0.43.60-yewfix4_darwin_arm64.tar.gz"
+      sha256 "6a3c156856be1a33b9a474f5cc549d50a7d7c936d25e87bc3885cbe0ea183f1b"
 
       define_method(:install) do
         bin.install "infisical"
@@ -36,8 +36,8 @@ class Infisical < Formula
 
   on_linux do
     if Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
-      url "https://github.com/YewFence/infisical-cli/releases/download/v0.43.60-yewfix3/infisical-cli_0.43.60-yewfix3_linux_amd64.tar.gz"
-      sha256 "a9ae6144a702479bcac5f2a85d761578bcacf627854570193551d61acdef963d"
+      url "https://github.com/YewFence/infisical-cli/releases/download/v0.43.60-yewfix4/infisical-cli_0.43.60-yewfix4_linux_amd64.tar.gz"
+      sha256 "a44800a36ecfb23d18be9c56b6b3a2636be45c8ba52dae5e302ae3f30b26a1f1"
       define_method(:install) do
         bin.install "infisical"
         bash_completion.install "completions/infisical.bash" => "infisical"
@@ -47,8 +47,8 @@ class Infisical < Formula
       end
     end
     if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
-      url "https://github.com/YewFence/infisical-cli/releases/download/v0.43.60-yewfix3/infisical-cli_0.43.60-yewfix3_linux_arm64.tar.gz"
-      sha256 "9295ca66526b017340d71dc9dd450d2877056bb51717b43da604c9d541e33b7b"
+      url "https://github.com/YewFence/infisical-cli/releases/download/v0.43.60-yewfix4/infisical-cli_0.43.60-yewfix4_linux_arm64.tar.gz"
+      sha256 "ff16487264e3fca9b4218431d7f796cb448cdd879a54dbd8f981597f1019a9e9"
       define_method(:install) do
         bin.install "infisical"
         bash_completion.install "completions/infisical.bash" => "infisical"
