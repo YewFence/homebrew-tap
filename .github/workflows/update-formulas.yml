@@ -1,0 +1,92 @@
+name: Update Formulas
+
+on:
+  workflow_dispatch:
+    inputs:
+      formula:
+        description: "指定要更新的 formula 名（留空则更新全部）"
+        required: false
+        type: string
+      version:
+        description: "手动指定版本号（留空则自动检测最新版）"
+        required: false
+        type: string
+  schedule:
+    - cron: "0 */12 * * *"
+
+jobs:
+  # 第一步：读取 formulas.yml，生成 matrix
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          YQ_VERSION="v4.44.3"
+          curl -fsSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" -o /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
+
+      - name: Generate matrix
+        id: gen
+        run: |
+          if [ -n "${{ inputs.formula }}" ]; then
+            # 手动指定了 formula，只跑这一个
+            MATRIX=$(yq -o=json '.formulas[] | select(.name == "${{ inputs.formula }}") | {"formula": .name}' formulas.yml \
+              | jq -sc '{"include": .}')
+          else
+            MATRIX=$(yq -o=json '.formulas[] | {"formula": .name}' formulas.yml \
+              | jq -sc '{"include": .}')
+          fi
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "Generated matrix: $MATRIX"
+
+  # 第二步：matrix 并行更新各 formula
+  update:
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+      fail-fast: false   # 一个失败不影响其他
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          YQ_VERSION="v4.44.3"
+          curl -fsSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" -o /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: "3.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run update
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          task update FORMULA=${{ matrix.formula }} VERSION="${{ inputs.version }}"
+
+      - name: Commit and push
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add Formula/ Casks/ 2>/dev/null || true
+
+          if git diff --cached --quiet; then
+            echo "No changes for ${{ matrix.formula }}, skipping commit."
+            exit 0
+          fi
+
+          # 从 rb 文件读取新版本号写进 commit message
+          NEW_VER=$(grep 'version "' $(yq '.formulas[] | select(.name == "${{ matrix.formula }}") | .formula_file' formulas.yml) \
+            | sed 's/.*version "\(.*\)".*/\1/' | head -n1)
+          git commit -m "chore: update ${{ matrix.formula }} to v${NEW_VER}"
+          git push

@@ -1,0 +1,45 @@
+formulas:
+  - name: cc-switch-cli
+    repo: SaladDay/cc-switch-cli
+    formula_file: Formula/cc-switch-cli.rb
+
+    # GitHub release 的 tag 前缀，用于：
+    #   1. 拼接下载 URL：.../releases/download/{tag_prefix}{version}/...
+    #   2. 从 tag_name 里去掉前缀得到版本号（如 v5.2.1 → 5.2.1）
+    # 如果 tag 本身就是纯版本号（没有前缀），设为 ""
+    tag_prefix: "v"
+
+    # 默认 asset 文件名模板，支持三个占位符：
+    #   {version} — 版本号（不含 tag_prefix，如 5.2.1）
+    #   {os}      — 来自下面 platforms[].os
+    #   {arch}    — 来自下面 platforms[].arch
+    # 每个 platform 也可以用 asset_pattern 字段单独覆盖这个默认值
+    asset_pattern: "cc-switch-cli-{os}-{arch}.tar.gz"
+
+    platforms:
+        # 每个平台一条，脚本会逐一下载对应 asset 并更新 rb 文件里对应的块
+      - os: darwin       # 拼入 asset_pattern {os} 的值
+        arch: arm64      # 拼入 asset_pattern {arch} 的值
+        rb_os_block: macos   # rb 文件里 on_??? do 的块名（macos 或 linux）
+        rb_cpu: arm          # rb 文件里 Hardware::CPU.???? 的值（intel 或 arm）
+        # macOS arm64: cc-switch-cli-darwin-arm64.tar.gz
+
+      - os: darwin
+        arch: x64
+        rb_os_block: macos
+        rb_cpu: intel
+        # macOS x64: cc-switch-cli-darwin-x64.tar.gz
+
+      - os: linux
+        arch: x64
+        rb_os_block: linux
+        rb_cpu: intel
+        # Linux x64 文件名格式不同，单独覆盖：cc-switch-cli-v{version}-linux-x64.tar.gz
+        asset_pattern: "cc-switch-cli-v{version}-{os}-{arch}.tar.gz"
+
+      - os: linux
+        arch: arm64
+        rb_os_block: linux
+        rb_cpu: arm
+        # Linux arm64: cc-switch-cli-v{version}-linux-arm64.tar.gz
+        asset_pattern: "cc-switch-cli-v{version}-{os}-{arch}.tar.gz"

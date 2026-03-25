@@ -1,0 +1,32 @@
+version: "3"
+
+# 用法：
+#   task update FORMULA=infisical
+#   task update FORMULA=infisical VERSION=0.43.60-yewfix4
+#   task update-all
+#
+# 依赖：yq, python3
+# 可选：GITHUB_TOKEN 环境变量（避免 API 限速）
+
+vars:
+  CONFIG_FILE: "formulas.yml"
+
+tasks:
+  update:
+    desc: "更新指定 formula（FORMULA=name，可选 VERSION=x.y.z）"
+    requires:
+      vars: [FORMULA]
+    cmds:
+      - python3 scripts/update_formula.py --config {{.CONFIG_FILE}} --formula {{.FORMULA}}{{if .VERSION}} --version {{.VERSION}}{{end}}
+
+  update-all:
+    desc: "更新 formulas.yml 里所有 formula"
+    vars:
+      NAMES:
+        sh: yq '.formulas[].name' {{.CONFIG_FILE}}
+    cmds:
+      - for:
+          var: NAMES
+        task: update
+        vars:
+          FORMULA: "{{.ITEM}}"
