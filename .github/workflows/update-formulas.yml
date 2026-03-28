@@ -26,7 +26,9 @@ jobs:
       - name: Install yq
         run: |
           YQ_VERSION="v4.44.3"
+          YQ_SHA256="a2c097180dd884a8d50c956ee16a9cec070f30a7947cf4ebf87d5f36213e9ed7"
           curl -fsSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" -o /usr/local/bin/yq
+          echo "${YQ_SHA256}  /usr/local/bin/yq" | sha256sum -c -
           chmod +x /usr/local/bin/yq
 
       - name: Generate matrix
@@ -34,13 +36,13 @@ jobs:
         run: |
           if [ -n "${{ inputs.formula }}" ]; then
             # 手动指定了 formula，只跑这一个
-            MATRIX=$(yq -o=json '.formulas[] | select(.name == "${{ inputs.formula }}") | {"formula": .name}' formulas.yml \
+            MATRIX=$(yq -o=json --arg name "${{ inputs.formula }}" '.formulas[] | select(.name == $name) | {"formula": .name}' formulas.yml \
               | jq -sc '{"include": .}')
           else
             MATRIX=$(yq -o=json '.formulas[] | {"formula": .name}' formulas.yml \
               | jq -sc '{"include": .}')
           fi
-          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "Generated matrix: $MATRIX"
 
   # 第二步：matrix 并行更新各 formula
@@ -59,7 +61,9 @@ jobs:
       - name: Install yq
         run: |
           YQ_VERSION="v4.44.3"
+          YQ_SHA256="a2c097180dd884a8d50c956ee16a9cec070f30a7947cf4ebf87d5f36213e9ed7"
           curl -fsSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" -o /usr/local/bin/yq
+          echo "${YQ_SHA256}  /usr/local/bin/yq" | sha256sum -c -
           chmod +x /usr/local/bin/yq
 
       - name: Install Task
@@ -86,7 +90,7 @@ jobs:
           fi
 
           # 从 rb 文件读取新版本号写进 commit message
-          NEW_VER=$(grep 'version "' $(yq '.formulas[] | select(.name == "${{ matrix.formula }}") | .formula_file' formulas.yml) \
-            | sed 's/.*version "\(.*\)".*/\1/' | head -n1)
+          FORMULA_FILE=$(yq -o=json --arg name "${{ matrix.formula }}" '.formulas[] | select(.name == $name) | .formula_file' formulas.yml | jq -r)
+          NEW_VER=$(grep 'version "' "$FORMULA_FILE" | sed 's/.*version "\(.*\)".*/\1/' | head -n1)
           git commit -m "chore: update ${{ matrix.formula }} to v${NEW_VER}"
           git push
