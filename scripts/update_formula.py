@@ -13,6 +13,7 @@ import json
 import os
 import re
 import subprocess
+import socket
 import sys
 import urllib.error
 import urllib.request
@@ -58,8 +59,15 @@ def gh_get(url: str) -> dict:
     token = os.environ.get("GITHUB_TOKEN")
     if token:
         req.add_header("Authorization", f"Bearer {token}")
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        return json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        print(f"ERROR: HTTP {e.code} for {url}: {e.reason}", file=sys.stderr)
+        sys.exit(1)
+    except (urllib.error.URLError, socket.timeout, socket.error) as e:
+        print(f"ERROR: network error for {url}: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def get_latest_version(repo: str, tag_prefix: str) -> str:
@@ -78,7 +86,7 @@ def get_current_version(formula_file: str) -> str:
         return ""
     with open(formula_file) as f:
         for line in f:
-            m = re.search(r'version "([^"]+)"', line)
+            m = re.match(r'^  version "([^"]+)"', line)
             if m:
                 return m.group(1)
     return ""
@@ -151,7 +159,10 @@ def download_and_sha256(url: str) -> str:
         with urllib.request.urlopen(req, timeout=300) as resp:  # longer timeout for asset downloads
             data = resp.read()
     except urllib.error.HTTPError as e:
-        print(f"ERROR: HTTP {e.code} for {url}", file=sys.stderr)
+        print(f"ERROR: HTTP {e.code} for {url}: {e.reason}", file=sys.stderr)
+        sys.exit(1)
+    except (urllib.error.URLError, socket.timeout, socket.error) as e:
+        print(f"ERROR: network error for {url}: {e}", file=sys.stderr)
         sys.exit(1)
     if not data:
         print(f"ERROR: empty response from {url}", file=sys.stderr)

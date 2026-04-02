@@ -39,9 +39,17 @@ jobs:
             # 手动指定了 formula，只跑这一个
             MATRIX=$(yq -o=json --arg name "${{ inputs.formula }}" '.formulas[] | select(.name == $name) | {"formula": .name}' formulas.yml \
               | jq -sc '{"include": .}')
+            if [ -z "$MATRIX" ] || echo "$MATRIX" | jq -e '.include | length == 0' >/dev/null; then
+              echo "::error::Formula '${{ inputs.formula }}' not found in formulas.yml"
+              exit 1
+            fi
           else
             MATRIX=$(yq -o=json '.formulas[] | {"formula": .name}' formulas.yml \
               | jq -sc '{"include": .}')
+            if [ -z "$MATRIX" ] || echo "$MATRIX" | jq -e '.include | length == 0' >/dev/null; then
+              echo "::error::No formulas found in formulas.yml"
+              exit 1
+            fi
           fi
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "Generated matrix: $MATRIX"
@@ -95,8 +103,13 @@ jobs:
           FORMULA_FILE=$(yq -o=json --arg name "${{ matrix.formula }}" '.formulas[] | select(.name == $name) | .formula_file' formulas.yml | jq -r)
           NEW_VER=$(grep 'version "' "$FORMULA_FILE" | sed 's/.*version "\(.*\)".*/\1/' | head -n1)
           git commit -m "chore: update ${{ matrix.formula }} to v${NEW_VER}"
+          PUSHED=false
           for i in 1 2 3; do
-            if git push; then break; fi
+            if git push; then PUSHED=true; break; fi
             echo "Push failed (attempt $i), rebasing..."
             git pull --rebase
           done
+          if [ "$PUSHED" = false ]; then
+            echo "::error::Failed to push ${{ matrix.formula }} after 3 attempts"
+            exit 1
+          fi
