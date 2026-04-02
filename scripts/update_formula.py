@@ -26,7 +26,7 @@ except ImportError:
 
 
 def load_config(config_file: str, formula_name: str) -> dict:
-    # Validate formula_name to prevent command injection
+    """加载 formulas.yml 中指定 formula 的配置。"""
     if not re.match(r'^[a-zA-Z0-9_-]+$', formula_name):
         print(f"ERROR: invalid formula name '{formula_name}'", file=sys.stderr)
         sys.exit(1)
@@ -53,6 +53,7 @@ def load_config(config_file: str, formula_name: str) -> dict:
 
 
 def gh_get(url: str) -> dict:
+    """带认证的 GitHub API GET 请求。"""
     req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
     token = os.environ.get("GITHUB_TOKEN")
     if token:
@@ -62,6 +63,7 @@ def gh_get(url: str) -> dict:
 
 
 def get_latest_version(repo: str, tag_prefix: str) -> str:
+    """从 GitHub Releases API 获取最新版本号，并去掉 tag 前缀。"""
     data = gh_get(f"https://api.github.com/repos/{repo}/releases/latest")
     tag = data.get("tag_name", "")
     if not tag:
@@ -84,8 +86,7 @@ def get_current_version(formula_file: str) -> str:
 
 def create_formula_skeleton(formula_file: str, formula_name: str, repo: str, platforms: list, tag_prefix: str) -> str:
     """当 formula 文件不存在时，创建一个骨架文件。"""
-    class_name = formula_name.replace("-", "").replace("_", "").capitalize()
-    repo_owner = repo.split("/")[0]
+    class_name = "".join(part.capitalize() for part in re.split(r"[-_]", formula_name))
 
     # 生成每个平台的块
     platform_blocks = []
@@ -140,6 +141,7 @@ end
 
 
 def download_and_sha256(url: str) -> str:
+    """下载文件并计算 SHA256 哈希值。"""
     print(f"  Downloading {url}")
     req = urllib.request.Request(url)
     token = os.environ.get("GITHUB_TOKEN")
@@ -159,14 +161,11 @@ def download_and_sha256(url: str) -> str:
     return digest
 
 
-def patch_formula(formula_file: str, rb_os: str, rb_cpu: str, new_url: str, new_sha256: str):
-    """替换 rb 文件里指定 on_{os}/Hardware::CPU.{cpu}? 块的 url 和 sha256"""
-    with open(formula_file) as f:
-        content = f.read()
-
+def patch_formula(content: str, rb_os: str, rb_cpu: str, new_url: str, new_sha256: str) -> str:
+    """在内存中替换 rb 文件里指定 on_{os}/Hardware::CPU.{cpu}? 块的 url 和 sha256，返回修改后的内容。"""
     os_m = re.search(rf"(  on_{rb_os}\s+do\b.*?^  end\b)", content, re.DOTALL | re.MULTILINE)
     if not os_m:
-        print(f"ERROR: on_{rb_os} block not found in {formula_file}", file=sys.stderr)
+        print(f"ERROR: on_{rb_os} block not found in formula", file=sys.stderr)
         sys.exit(1)
 
     os_block = os_m.group(0)
@@ -184,10 +183,8 @@ def patch_formula(formula_file: str, rb_os: str, rb_cpu: str, new_url: str, new_
 
     new_os_block = os_block[:cpu_m.start()] + patched + os_block[cpu_m.end():]
     content = content[:os_m.start()] + new_os_block + content[os_m.end():]
-
-    with open(formula_file, "w") as f:
-        f.write(content)
     print(f"  Patched on_{rb_os}/CPU.{rb_cpu}?")
+    return content
 
 
 def main():
@@ -209,6 +206,14 @@ def main():
     tag_prefix    = cfg.get("tag_prefix", "v")
     platforms     = cfg["platforms"]
 
+    # 校验每个平台的必需字段
+    required_platform_keys = ["os", "arch", "rb_os_block", "rb_cpu"]
+    for i, p in enumerate(platforms):
+        p_missing = [k for k in required_platform_keys if k not in p]
+        if p_missing:
+            print(f"ERROR: platform[{i}] missing required fields: {p_missing}", file=sys.stderr)
+            sys.exit(1)
+
     # 如果 formula 文件不存在，创建骨架
     if not os.path.exists(formula_file):
         create_formula_skeleton(formula_file, args.formula, repo, platforms, tag_prefix)
@@ -221,6 +226,10 @@ def main():
         print(f"{args.formula}: already up to date, skipping.")
         sys.exit(0)
 
+    # 读取 formula 文件内容，在内存中完成所有修改后再一次写入，避免部分写入
+    with open(formula_file) as f:
+        content = f.read()
+
     for p in platforms:
         pattern = p.get("asset_pattern", asset_pattern)  # platform 级别可覆盖默认值
         asset = (pattern
@@ -229,12 +238,11 @@ def main():
                  .replace("{arch}", p["arch"]))
         url = f"https://github.com/{repo}/releases/download/{tag_prefix}{new_ver}/{asset}"
         sha256 = download_and_sha256(url)
-        patch_formula(formula_file, p["rb_os_block"], p["rb_cpu"], url, sha256)
+        content = patch_formula(content, p["rb_os_block"], p["rb_cpu"], url, sha256)
 
     # 更新顶层 version 字段（只匹配类级别的 version，即行首有2空格缩进）
-    with open(formula_file) as f:
-        content = f.read()
     content = re.sub(r'^  version "[^"]*"', f'  version "{new_ver}"', content, flags=re.MULTILINE)
+
     with open(formula_file, "w") as f:
         f.write(content)
 

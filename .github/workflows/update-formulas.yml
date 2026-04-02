@@ -34,6 +34,7 @@ jobs:
       - name: Generate matrix
         id: gen
         run: |
+          # shellcheck disable=SC2016
           if [ -n "${{ inputs.formula }}" ]; then
             # 手动指定了 formula，只跑这一个
             MATRIX=$(yq -o=json --arg name "${{ inputs.formula }}" '.formulas[] | select(.name == $name) | {"formula": .name}' formulas.yml \
@@ -90,7 +91,12 @@ jobs:
           fi
 
           # 从 rb 文件读取新版本号写进 commit message
+          # shellcheck disable=SC2016
           FORMULA_FILE=$(yq -o=json --arg name "${{ matrix.formula }}" '.formulas[] | select(.name == $name) | .formula_file' formulas.yml | jq -r)
           NEW_VER=$(grep 'version "' "$FORMULA_FILE" | sed 's/.*version "\(.*\)".*/\1/' | head -n1)
           git commit -m "chore: update ${{ matrix.formula }} to v${NEW_VER}"
-          git push
+          for i in 1 2 3; do
+            if git push; then break; fi
+            echo "Push failed (attempt $i), rebasing..."
+            git pull --rebase
+          done
