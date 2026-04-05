@@ -1,0 +1,175 @@
+name: Auto-bump Formulae
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # 每天 UTC 04:00
+  workflow_dispatch:
+    inputs:
+      formula:
+        description: "指定要更新的 formula 名（留空则更新全部）"
+        required: false
+        type: string
+      version:
+        description: "手动指定版本号（留空则自动检测最新版）"
+        required: false
+        type: string
+
+jobs:
+  # 第一步：从 formulas.yml 动态生成 matrix
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          YQ_VERSION="v4.44.3"
+          YQ_SHA256="a2c097180dd884a8d50c956ee16a9cec070f30a7947cf4ebf87d5f36213e9ed7"
+          curl -fsSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" -o /usr/local/bin/yq
+          echo "${YQ_SHA256}  /usr/local/bin/yq" | sha256sum -c -
+          chmod +x /usr/local/bin/yq
+
+      - name: Generate matrix
+        id: gen
+        env:
+          INPUT_FORMULA: ${{ inputs.formula }}
+        run: |
+          if [ -n "$INPUT_FORMULA" ]; then
+            MATRIX=$(yq -o=json --arg name "$INPUT_FORMULA" \
+              '.formulas[] | select(.name == $name) | {"formula": .name}' formulas.yml \
+              | jq -sc '{"include": .}')
+            if [ -z "$MATRIX" ] || echo "$MATRIX" | jq -e '.include | length == 0' > /dev/null; then
+              echo "::error::Formula '$INPUT_FORMULA' not found in formulas.yml"
+              exit 1
+            fi
+          else
+            MATRIX=$(yq -o=json '.formulas[] | {"formula": .name}' formulas.yml \
+              | jq -sc '{"include": .}')
+            if [ -z "$MATRIX" ] || echo "$MATRIX" | jq -e '.include | length == 0' > /dev/null; then
+              echo "::error::No formulas found in formulas.yml"
+              exit 1
+            fi
+          fi
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "Generated matrix: $MATRIX"
+
+  # 第二步：并行检查并为每个有更新的 formula 开 PR
+  bump:
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    strategy:
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up git
+        uses: Homebrew/actions/git-user-config@main
+
+      - name: Install yq
+        run: |
+          YQ_VERSION="v4.44.3"
+          YQ_SHA256="a2c097180dd884a8d50c956ee16a9cec070f30a7947cf4ebf87d5f36213e9ed7"
+          curl -fsSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" -o /usr/local/bin/yq
+          echo "${YQ_SHA256}  /usr/local/bin/yq" | sha256sum -c -
+          chmod +x /usr/local/bin/yq
+
+      - name: Install PyYAML
+        run: pip3 install pyyaml --quiet
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: "3.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check latest version
+        id: version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORMULA: ${{ matrix.formula }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          # 读取 formula 对应的 repo
+          REPO=$(yq -o=json --arg name "$FORMULA" \
+            '.formulas[] | select(.name == $name) | .repo' formulas.yml | jq -r)
+          TAG_PREFIX=$(yq -o=json --arg name "$FORMULA" \
+            '.formulas[] | select(.name == $name) | .tag_prefix // "v"' formulas.yml | jq -r)
+          FORMULA_FILE=$(yq -o=json --arg name "$FORMULA" \
+            '.formulas[] | select(.name == $name) | .formula_file' formulas.yml | jq -r)
+
+          if [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            TAG=$(gh release view --repo "$REPO" --json tagName -q '.tagName')
+            VERSION="${TAG#"$TAG_PREFIX"}"
+          fi
+
+          CURRENT=$(grep -m1 '  version ' "$FORMULA_FILE" | sed 's/.*version "\(.*\)".*/\1/')
+
+          echo "repo=$REPO" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "formula_file=$FORMULA_FILE" >> "$GITHUB_OUTPUT"
+
+          if [ "$VERSION" = "$CURRENT" ]; then
+            echo "up_to_date=true" >> "$GITHUB_OUTPUT"
+            echo "$FORMULA is already at $VERSION, skipping."
+          else
+            echo "up_to_date=false" >> "$GITHUB_OUTPUT"
+            echo "$FORMULA: $CURRENT → $VERSION"
+          fi
+
+      - name: Update formula
+        if: steps.version.outputs.up_to_date == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORMULA: ${{ matrix.formula }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          task update FORMULA="$FORMULA" VERSION="$VERSION"
+
+      - name: Open PR
+        if: steps.version.outputs.up_to_date == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORMULA: ${{ matrix.formula }}
+          VERSION: ${{ steps.version.outputs.version }}
+          FORMULA_FILE: ${{ steps.version.outputs.formula_file }}
+          BRANCH: update/${{ matrix.formula }}-${{ steps.version.outputs.version }}
+        run: |
+          # 如果同版本的分支已经存在（PR 已开），直接跳过
+          if git ls-remote --exit-code origin "refs/heads/$BRANCH" > /dev/null 2>&1; then
+            echo "Branch $BRANCH already exists, skipping."
+            exit 0
+          fi
+
+          git checkout -b "$BRANCH"
+          git add "$FORMULA_FILE"
+          git commit -m "feat($FORMULA): bump to $VERSION"
+          git push origin "$BRANCH"
+
+          PR_URL=$(gh pr create \
+            --title "$FORMULA: bump to $VERSION" \
+            --body "Auto-bump by autobump workflow.
+
+- Formula: \`$FORMULA\`
+- Version: \`$VERSION\`" \
+            --base main \
+            --head "$BRANCH")
+
+          echo "PR created: $PR_URL"
+
+          # 开启 auto-merge（squash），等 required status checks 通过后自动合并
+          gh pr merge "$BRANCH" --auto --squash
