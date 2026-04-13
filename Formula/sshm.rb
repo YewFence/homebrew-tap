@@ -5,43 +5,43 @@
 class Sshm < Formula
   desc "CLI to manage ~/.ssh/config easily"
   homepage "https://github.com/YewFence/ssh-config-manager"
-  version "0.0.5"
+  version "0.0.6"
   license "MIT"
 
   on_macos do
     on_arm do
-      url "https://github.com/YewFence/ssh-config-manager/releases/download/v#{version}/sshm-v#{version}-macos-arm64"
-      sha256 "a1fc8f8d12229f1f75ba351e1949ed82d977611b508e9e23a2411f0e48c77815"
+      url "https://github.com/YewFence/ssh-config-manager/releases/download/v#{version}/sshm-v#{version}-macos-arm64.zip"
+      sha256 "cf84f33557433d399cc3413311a24bb7748f5d03ba9f3b839c243af4c222221e"
 
       define_method(:install) do
-        bin.install "sshm-v#{version}-macos-arm64" => "sshm"
+        bin.install "sshm"
       end
     end
     on_intel do
-      url "https://github.com/YewFence/ssh-config-manager/releases/download/v#{version}/sshm-v#{version}-macos-amd64"
-      sha256 "8ff8f749daf4b947fa71fcfbd5fd16fe435590ff7ac73cf3f532382915e6c27a"
+      url "https://github.com/YewFence/ssh-config-manager/releases/download/v#{version}/sshm-v#{version}-macos-amd64.zip"
+      sha256 "211336affdbe9f1f1528498eefffdf2522cdd68a87078df6cac62d68611a8640"
 
       define_method(:install) do
-        bin.install "sshm-v#{version}-macos-amd64" => "sshm"
+        bin.install "sshm"
       end
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/YewFence/ssh-config-manager/releases/download/v#{version}/sshm-v#{version}-linux-arm64"
-      sha256 "fe1ae5fbaeec009e085b058a2f767b6fc7601940dd7f0c868189878ef4ad160b"
+      url "https://github.com/YewFence/ssh-config-manager/releases/download/v#{version}/sshm-v#{version}-linux-arm64.zip"
+      sha256 "4e5dcb8afe324239116b222cfbeb3b181ee67c7303e8ef72ff02a84cebfd6e4d"
 
       define_method(:install) do
-        bin.install "sshm-v#{version}-linux-arm64" => "sshm"
+        bin.install "sshm"
       end
     end
     on_intel do
-      url "https://github.com/YewFence/ssh-config-manager/releases/download/v#{version}/sshm-v#{version}-linux-amd64"
-      sha256 "47e329f1ab86fca9bbe67a322ee9b4551ac1e8c90b134313f4d4dd22761f36fe"
+      url "https://github.com/YewFence/ssh-config-manager/releases/download/v#{version}/sshm-v#{version}-linux-amd64.zip"
+      sha256 "16bcf3195c42775645db8857a1061f01ba0c29c00735738308f5d54c6241005a"
 
       define_method(:install) do
-        bin.install "sshm-v#{version}-linux-amd64" => "sshm"
+        bin.install "sshm"
       end
     end
   end
