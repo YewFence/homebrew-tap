@@ -11,7 +11,7 @@ class Sshm < Formula
   on_macos do
     on_arm do
       url "https://github.com/YewFence/ssh-config-manager/releases/download/v#{version}/sshm-v#{version}-macos-arm64.zip"
-      sha256 "cf84f33557433d399cc3413311a24bb7748f5d03ba9f3b839c243af4c222221e"
+      sha256 "3125056af7f775077d62e506cb5ba4a094bccb9bff525e0e8214f6b3d9a04552"
 
       define_method(:install) do
         bin.install "sshm"
@@ -19,7 +19,7 @@ class Sshm < Formula
     end
     on_intel do
       url "https://github.com/YewFence/ssh-config-manager/releases/download/v#{version}/sshm-v#{version}-macos-amd64.zip"
-      sha256 "211336affdbe9f1f1528498eefffdf2522cdd68a87078df6cac62d68611a8640"
+      sha256 "8e857513a6f5ae923eaa75947b88f46134f8cf7396bc13cf5ce83634ade8ff30"
 
       define_method(:install) do
         bin.install "sshm"
@@ -30,7 +30,7 @@ class Sshm < Formula
   on_linux do
     on_arm do
       url "https://github.com/YewFence/ssh-config-manager/releases/download/v#{version}/sshm-v#{version}-linux-arm64.zip"
-      sha256 "4e5dcb8afe324239116b222cfbeb3b181ee67c7303e8ef72ff02a84cebfd6e4d"
+      sha256 "84fb2fbc4b937af4b1111abda25916173c7d17f9bda8b3c85958bdcf2e010759"
 
       define_method(:install) do
         bin.install "sshm"
@@ -38,7 +38,7 @@ class Sshm < Formula
     end
     on_intel do
       url "https://github.com/YewFence/ssh-config-manager/releases/download/v#{version}/sshm-v#{version}-linux-amd64.zip"
-      sha256 "16bcf3195c42775645db8857a1061f01ba0c29c00735738308f5d54c6241005a"
+      sha256 "face1ddc9b13356f53484bb95127c0857e6b514c07866b49b1dc0926e819a844"
 
       define_method(:install) do
         bin.install "sshm"
